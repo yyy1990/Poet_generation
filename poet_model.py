@@ -42,6 +42,10 @@ Config = DictObj({
 
 class PoemDataSet(Dataset):
     def __init__(self,poem_path,seq_len):
+        '''
+        poem_path: 数据路径
+        seq_len: 诗歌长度
+        '''
         self.seq_len = seq_len
         self.poem_path = poem_path
         self.poem_data, self.ix2word, self.word2ix = self.get_raw_data()
@@ -57,21 +61,20 @@ class PoemDataSet(Dataset):
     def __len__(self):
         return int(len(self.no_space_data) / self.seq_len)
     
-    def filter_space(self): # 将空格的数据给过滤掉，并将原始数据平整到一维
+    def filter_space(self): 
         t_data = torch.from_numpy(self.poem_data).view(-1)
         flat_data = t_data.numpy()
         no_space_data = []
         for i in flat_data:
-            if (i != 8292 ):
+            if (i != 8292 ): #8292代表空格
                 no_space_data.append(i)
         return no_space_data
     
     def get_raw_data(self):
-#         datas = np.load(self.poem_path,allow_pickle=True)  #numpy 1.16.2  以上引入了allow_pickle
         datas = np.load(self.poem_path, allow_pickle = True)
         data = datas['data']
-        ix2word = datas['ix2word'].item()
-        word2ix = datas['word2ix'].item()
+        ix2word = datas['ix2word'].item() #序号->字
+        word2ix = datas['word2ix'].item() #字->序号
         return data, ix2word, word2ix
 
 
@@ -94,7 +97,7 @@ class MyPoetryModel_tanh(nn.Module):
             c_0 = _input.data.new(Config.LSTM_layers*1, batch_size, self.hidden_dim).fill_(0).float()
         else:
             h_0, c_0 = hidden
-        output, hidden = self.lstm(embeds, (h_0, c_0))#hidden 是h,和c 这两个隐状态
+        output, hidden = self.lstm(embeds, (h_0, c_0))
         output = torch.tanh(self.fc1(output))
         output = torch.tanh(self.fc2(output))
         output = self.fc3(output)
@@ -117,11 +120,14 @@ class AvgrageMeter(object):
         self.avg = self.sum / self.cnt
 
 
-def accuracy(output, label, topk=(1,)): ## topk的准确率计算
+def accuracy(output, label, topk=(1,)): 
+    '''
+    topk的准确率计算
+    '''
     maxk = max(topk) 
     batch_size = label.size(0)
     
-    _, pred = output.topk(maxk, 1, True, True) #使用topk来获得前k个的索引
+    _, pred = output.topk(maxk, 1, True, True) 
     pred = pred.t() 
     correct = pred.eq(label.view(1, -1).expand_as(pred)) 
 
@@ -132,8 +138,11 @@ def accuracy(output, label, topk=(1,)): ## topk的准确率计算
     return rtn
 
 
-#训练中使用tensorboard来绘制曲线，终端输入tensorboard --logdir=/path_to_log_dir/ --port 6006 可查看
+
 def train(epochs, train_loader, device, model, criterion, optimizer, scheduler, tensorboard_path):
+    '''
+    训练中使用tensorboard来绘制曲线，终端输入tensorboard --logdir=/path_to_log_dir/ --port 6006 可查看
+    '''
     model.train()
     top1 = AvgrageMeter()
     model = model.to(device)
@@ -144,7 +153,7 @@ def train(epochs, train_loader, device, model, criterion, optimizer, scheduler, 
         for i, data in enumerate(train_loader, 0):  # 0是下标起始位置默认为0
             inputs, labels = data[0].to(device), data[1].to(device)
             labels = labels.view(-1) # 因为outputs经过平整，所以labels也要平整来对齐
-            # 初始为0，清除上个batch的梯度信息
+            
             optimizer.zero_grad()
             outputs,hidden = model(inputs)
             loss = criterion(outputs,labels)
@@ -172,7 +181,6 @@ def train(epochs, train_loader, device, model, criterion, optimizer, scheduler, 
 
 def main_train(batch_size = Config.batch_size, lr = Config.lr, epochs = Config.epochs):
     poem_ds = PoemDataSet(Config.poem_path, Config.seq_len)
-    #ix2word = poem_ds.ix2word
     word2ix = poem_ds.word2ix
     poem_loader =  DataLoader(poem_ds,batch_size=batch_size,shuffle=True,num_workers=0)
     model = MyPoetryModel_tanh(len(word2ix),embedding_dim=Config.embedding_dim,hidden_dim=Config.hidden_dim)
