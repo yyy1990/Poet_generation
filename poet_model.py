@@ -180,6 +180,9 @@ def train(epochs, train_loader, device, model, criterion, optimizer, scheduler, 
 
 
 def main_train(batch_size = Config.batch_size, lr = Config.lr, epochs = Config.epochs):
+    '''
+    确定batch_size, lr, epochs后训练
+    '''
     poem_ds = PoemDataSet(Config.poem_path, Config.seq_len)
     word2ix = poem_ds.word2ix
     poem_loader =  DataLoader(poem_ds,batch_size=batch_size,shuffle=True,num_workers=0)
@@ -196,6 +199,9 @@ def main_train(batch_size = Config.batch_size, lr = Config.lr, epochs = Config.e
 
 
 def generate(start_words, model_path = 'poet_generation.pth', data_path = Config.poem_path, max_len = 48):
+    '''
+    诗歌补全
+    '''
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = torch.load(model_path)
     poem_ds = PoemDataSet(data_path, Config.seq_len)
@@ -229,57 +235,13 @@ def generate(start_words, model_path = 'poet_generation.pth', data_path = Config
                 if w == '<EOP>': # 输出了结束标志就退出
                     del results[-1]
                     break
-    return results 
-
-
-def cang_tou_old(start_words, n = 5, model_path = 'poet_generation.pth', data_path = Config.poem_path):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = torch.load(model_path)
-    poem_ds = PoemDataSet(data_path, Config.seq_len)
-    ix2word = poem_ds.ix2word
-    word2ix = poem_ds.word2ix
-
-    results = []
-    # 第一个词语是<START>
-    _input = torch.Tensor([word2ix['<START>']]).view(1, 1).long()
-
-    hidden = torch.zeros((2, Config.LSTM_layers*1,1,Config.hidden_dim),dtype=torch.float)
-    _input = _input.to(device)
-    hidden = hidden.to(device)
-    model = model.to(device)
-    model.eval()
-
-    except_list = ['<START>', '<EOP>', '，', ' 。']
-
-    with torch.no_grad():
-        for i in range(len(start_words)): #藏头字
-            for j in range(2*(n+1)):
-                output, hidden = model(_input, hidden)
-                
-                if j == 0: #首字使用藏头字
-                    w = start_words[i]
-                    _input = _input.data.new([word2ix[w]]).view(1, 1)
-                    results.append(w)
-                elif j == n: #半句写完加逗号
-                    w = '，'
-                    _input = _input.data.new([word2ix[w]]).view(1, 1)
-                    results.append(w)
-                elif j == (2*n+1): #全句写完加句号
-                    w = '。'
-                    _input = _input.data.new([word2ix[w]]).view(1, 1)
-                    results.append(w)
-                else: #其他文字处
-                    w = '<EOP>'
-                    ind = 0
-                    while w in except_list:
-                        select_index = output.data[0].topk(ind+1)[1][ind].item()
-                        w = ix2word[select_index]
-                        ind = ind + 1
-                    results.append(w)
-    return results 
+    return results  
 
 
 def cang_tou(start_words, model_path = 'poet_generation.pth', data_path = Config.poem_path):
+    '''
+    生成藏头诗
+    '''
     result = []
     l = []
     for word in start_words:
